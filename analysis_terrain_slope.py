@@ -21,4 +21,7 @@ for i in range(len(wmax)):
 plt.xlabel("Terrain Angle (deg)")
 plt.ylabel("Max Rover Speed (m/s)")
 plt.title("Max Rover Speed vs Terrain Angle")
-plt.plot(slope, v_max)
+plt.plot(slope, v_max, label = 'Max Speed')
+plt.grid(True)
+plt.legend()
+plt.show()
