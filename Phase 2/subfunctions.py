@@ -529,14 +529,15 @@ def battenergy(t, v, rover):
     effcy = rover["wheel_assembly"]["motor"]["effcy"]
     effcy_tau = rover["wheel_assembly"]["motor"]["effcy_tau"]
     omega_motor = motorW(v,rover)
+    motor = rover["wheel_assembly"]["motor"]
 
-    tau_motor = tau_dcmotor(omega_motor,rover)
+    tau_motor = tau_dcmotor(omega_motor,motor)
     
     effcy_fun = interp1d(effcy_tau, effcy, kind="cubic")
     interp_effcy = effcy_fun(tau_motor) #Motor efficiency as a function of torque in decimal form
-    p_instant = (mechpower(v,rover)) / interp_effcy #Array of instantaneous power consumption accounting for efficiency at each time/ velocity
-    E = np.trapz(p_instant,t)
+    p_instant = 6 * (mechpower(v,rover)) / interp_effcy #Array of instantaneous power consumption for all 6 wheels accounting for efficiency at each time/ velocity
     
+    E = trapezoid(p_instant,t)
 
     return E
 
