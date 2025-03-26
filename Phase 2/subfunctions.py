@@ -537,10 +537,86 @@ def battenergy(t, v, rover):
     interp_effcy = effcy_fun(tau_motor) #Motor efficiency as a function of torque in decimal form
     p_instant = 6 * (mechpower(v,rover)) / interp_effcy #Array of instantaneous power consumption for all 6 wheels accounting for efficiency at each time/ velocity
     
-    E = trapezoid(p_instant,t)
+    E = np.trapz(p_instant,t)
 
     return E
-
+def end_of_mission_event(end_event):
+    """
+    Defines an event that terminates the mission simulation. Mission is over
+    when rover reaches a certain distance, has moved for a maximum simulation 
+    time or has reached a minimum velocity.            
+    """
+    
+    mission_distance = end_event['max_distance']
+    mission_max_time = end_event['max_time']
+    mission_min_velocity = end_event['min_velocity']
+    
+    # Assume that y[1] is the distance traveled
+    distance_left = lambda t,y: mission_distance - y[1]
+    distance_left.terminal = True
+    
+    time_left = lambda t,y: mission_max_time - t
+    time_left.terminal = True
+    
+    velocity_threshold = lambda t,y: y[0] - mission_min_velocity;
+    velocity_threshold.terminal = True
+    velocity_threshold.direction = -1
+    
+    # terminal indicates whether any of the conditions can lead to the
+    # termination of the ODE solver. In this case all conditions can terminate
+    # the simulation independently.
+    
+    # direction indicates whether the direction along which the different
+    # conditions is reached matters or does not matter. In this case, only
+    # the direction in which the velocity treshold is arrived at matters
+    # (negative)
+    
+    events = [distance_left, time_left, velocity_threshold]
+    
+    return events
+def simulate_rover(rover, planet, experiment, end_event):
+    """
+    Integrates the trajectory of the rover using an ODE solver and gives a new dictionary with updated information.
+    """
+    # check to see if planet, rover, experiment and end_event are dictionaries
+    if type(planet) != dict: 
+        raise Exception('Input for planet must be a dictionary.')
+    elif type(rover) != dict: 
+        raise Exception('Input for rover must be a dictionary.')
+    elif type(experiment) != dict: 
+        raise Exception('Input for experiment must be a dictionary.')
+        
+    elif type(end_event) != dict: 
+        raise Exception('Input for experiment must be a dictionary.')
+        
+    # Initial condition
+    y0 = experiment['initial_conditions']
+    
+    f = lambda t, y: rover_dynamics(float(t), y, rover, planet, experiment)
+    
+    t_range = experiment['time_range']
+            
+    # solve_ivp pulled from scipy.integrate
+    ans = solve_ivp(f,t_range,y0,method='BDF',t_eval= np.linspace(t_range[0],t_range[-1],1000),events=end_of_mission_event(end_event))
+    
+    distance = ans.y[1][-1]
+    power = mechpower(ans.y[0], rover)
+    batt = battenergy(ans.t,ans.y[0],rover)
+    epd = batt/distance
+    
+    rover['telemetry'] = {}
+    rover['telemetry']['Time']= np.array(ans.t)
+    rover['telemetry']['completion_time']= ans.t[-1]
+    rover['telemetry']['velocity']= np.array(ans.y[0])
+    rover['telemetry']['average_velocity']= np.mean(ans.y[0])
+    rover['telemetry']['position']= np.array(ans.y[1])
+    rover['telemetry']['distance_traveled']= distance
+    rover['telemetry']['power']=np.array(power)
+    rover['telemetry']['battery_energy']= batt
+    rover['telemetry']['max_velocity']= np.max(ans.y[0])
+    rover['telemetry']['energy_per_distance']= epd
+                        
+    return rover
 
 
 
